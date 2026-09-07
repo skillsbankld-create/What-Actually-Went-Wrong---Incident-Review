@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Actually Went Wrong? — Incident Review</title>
+<style>
+/* ======================================================================
+   DESIGN TOKENS
+   ====================================================================== */
+:root{
+  --navy:#14143A;
+  --navy-2:#1E1E52;
+  --ink:#201F33;
+  --ink-soft:#514F68;
+  --paper:#F5F0E4;
+  --paper-2:#FFFFFF;
+  --line:#DED2B6;
+  --line-soft:#E9E0CC;
+  --coral:#C1472E;
+  --coral-text:#A83D26;
+  --coral-tint:#FBECE8;
+  --teal:#1C7F73;
+  --teal-tint:#E9F4F2;
+  --mustard:#AD7A16;
+  --mustard-tint:#FBF1DD;
+  --mark:rgba(244,178,24,.45);
+  --focus:#2B5FE2;
+  --shadow-sm:0 2px 8px rgba(20,20,58,.07);
+  --shadow-md:0 10px 28px rgba(20,20,58,.11);
+  --shadow-lg:0 20px 48px rgba(20,20,58,.16);
+  --radius-card:14px;
+  --radius-chip:9px;
+  --font-serif:Georgia,'Iowan Old Style','Palatino Linotype',Palatino,serif;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-ar:'Segoe UI','Tahoma','Geeza Pro','Arial',sans-serif;
+  --dur-micro:200ms;
+  --dur-panel:480ms;
+  --ease:cubic-bezier(.25,.7,.35,1);
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  min-height:100vh;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+body.lang-ar{font-family:var(--font-ar);}
+h1,h2,h3{font-family:var(--font-serif);margin:0;color:var(--navy);font-weight:700;}
+body.lang-ar h1, body.lang-ar h2, body.lang-ar h3{font-family:var(--font-ar);font-weight:700;}
+p{margin:0;}
+button{font-family:inherit;font-size:inherit;color:inherit;}
+img,svg{display:block;}
+.visually-hidden{
+  position:absolute !important;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+
+/* Focus states */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible, [role="radio"]:focus-visible{
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+  border-radius:4px;
+}
+a:focus:not(:focus-visible), button:focus:not(:focus-visible){outline:none;}
+
+/* ======================================================================
+   LAYOUT SHELL
+   ====================================================================== */
+#root{min-height:100vh;display:flex;flex-direction:column;}
+
+.topbar{
+  display:flex;align-items:center;gap:1.25rem;
+  padding:.9rem 2rem;
+  background:var(--paper-2);
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:center;gap:.85rem;min-width:0;}
+.brand-logo{flex:0 0 auto;height:28px;width:auto;}
+.brand-logo svg{height:28px;width:auto;display:block;}
+.brand-kicker{
+  font-size:.8rem;color:var(--ink-soft);
+  border-inline-start:1px solid var(--line);
+  padding-inline-start:.85rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.topbar-actions{margin-inline-start:auto;display:flex;align-items:center;gap:1rem;flex:0 0 auto;}
+.lang-switch{
+  display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;
+}
+.lang-switch button{
+  border:none;background:transparent;padding:.4rem .85rem;cursor:pointer;
+  font-size:.85rem;color:var(--ink-soft);transition:background var(--dur-micro) ease,color var(--dur-micro) ease;
+}
+.lang-switch button[aria-pressed="true"]{background:var(--navy);color:#fff;}
+.reset-link{
+  border:none;background:none;cursor:pointer;font-size:.85rem;color:var(--ink-soft);
+  text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;
+  padding:.2rem 0;
+}
+.reset-link:hover{color:var(--ink);text-decoration-color:var(--ink-soft);}
+.storage-note{
+  font-size:.72rem;color:var(--coral-text);background:var(--coral-tint);
+  padding:.25rem .6rem;border-radius:999px;
+}
+
+.hero{padding:1.4rem 2rem .6rem;max-width:1280px;margin:0 auto;width:100%;}
+.hero h1{font-size:2.1rem;letter-spacing:-.01em;}
+.hero .hero-sub{margin-top:.35rem;font-size:1rem;color:var(--ink-soft);}
+.hero .hero-help{margin-top:.6rem;font-size:.92rem;color:var(--ink-soft);max-width:62ch;}
+
+main{flex:1;width:100%;max-width:1280px;margin:0 auto;padding:0 2rem 2.5rem;display:flex;flex-direction:column;}
+
+/* Case tabs */
+.case-tabs{
+  display:flex;gap:.4rem;margin:1.1rem 0 1.4rem;padding-bottom:0;
+  border-bottom:1px solid var(--line);
+  overflow-x:auto;
+}
+.case-tab{
+  border:1px solid var(--line);border-bottom:none;
+  background:var(--paper-2);
+  padding:.5rem .95rem .6rem;
+  border-radius:8px 8px 0 0;
+  font-size:.85rem;color:var(--ink-soft);
+  cursor:default;white-space:nowrap;
+  transform:translateY(1px);
+  transition:transform var(--dur-micro) var(--ease),background var(--dur-micro) ease;
+  display:flex;align-items:center;gap:.4rem;
+}
+.case-tab .num{
+  width:1.3rem;height:1.3rem;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:.72rem;background:var(--line-soft);color:var(--ink-soft);flex:0 0 auto;
+}
+.case-tab.active{
+  background:var(--paper);color:var(--navy);font-weight:600;
+  transform:translateY(2px);border-color:var(--line);
+}
+.case-tab.active .num{background:var(--navy);color:#fff;}
+.case-tab.done .num{background:var(--teal);color:#fff;}
+.case-tab.done{cursor:pointer;}
+.case-tab.done:hover{background:var(--paper);}
+.case-tab.locked{opacity:.45;}
+
+/* ======================================================================
+   INCIDENT VIEW — two column
+   ====================================================================== */
+.incident-grid{
+  display:grid;grid-template-columns:1.28fr 1fr;gap:1.75rem;align-items:start;
+}
+@media (max-width: 880px){
+  .incident-grid{grid-template-columns:1fr;}
+}
+
+/* Case sheet (left) */
+.case-sheet{
+  position:relative;
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-radius:4px;
+  box-shadow:var(--shadow-md);
+  padding:2.1rem 2rem 1.9rem;
+  transform:rotate(-.35deg);
+  animation:sheetIn var(--dur-panel) var(--ease);
+}
+@keyframes sheetIn{
+  from{opacity:0;transform:rotate(-.35deg) translateY(10px);}
+  to{opacity:1;transform:rotate(-.35deg) translateY(0);}
+}
+.case-clip{position:absolute;top:-14px;inset-inline-end:34px;width:34px;height:46px;opacity:.85;}
+.case-tag{
+  display:inline-block;
+  font-family:var(--font-serif);
+  font-style:italic;
+  font-size:1rem;
+  background:var(--paper);
+  border:1px solid var(--line);
+  padding:.45rem .9rem;
+  border-radius:3px;
+  transform:rotate(-1.4deg);
+  box-shadow:0 3px 6px rgba(20,20,58,.08);
+  color:var(--navy);
+  margin-bottom:1.1rem;
+}
+body.lang-ar .case-tag{font-style:normal;font-weight:600;}
+.case-number{
+  font-size:.78rem;color:var(--ink-soft);letter-spacing:.02em;margin-bottom:.35rem;
+}
+.case-scenario{
+  font-size:1.18rem;line-height:1.68;color:var(--ink);
+  max-width:56ch;
+}
+.case-scenario .ev{
+  all:unset;cursor:pointer;display:inline;
+  padding:0 .05em;border-radius:2px;
+  border-bottom:1.5px dashed rgba(32,31,51,.38);
+  transition:background-color var(--dur-micro) ease, border-color var(--dur-micro) ease;
+}
+.case-scenario .ev:hover, .case-scenario .ev:focus-visible{
+  border-color:var(--ink);background-color:rgba(32,31,51,.06);
+}
+.case-scenario .ev[aria-pressed="true"]{
+  border-color:transparent;
+  background-image:linear-gradient(to bottom, transparent 58%, var(--mark) 58%);
+}
+.case-scenario mark{
+  background-image:linear-gradient(to bottom, transparent 58%, var(--mark) 58%);
+  background-color:transparent;color:inherit;padding:0 .05em;border-radius:2px;
+}
+.case-scenario .ev-plain{color:inherit;}
+.case-atmosphere{
+  margin-top:1.4rem;padding-top:1rem;border-top:1px solid var(--line-soft);
+  font-size:.85rem;color:var(--ink-soft);display:flex;align-items:center;gap:.5rem;
+  transition:opacity var(--dur-panel) ease;
+}
+.case-atmosphere .dot{width:.5rem;height:.5rem;border-radius:50%;flex:0 0 auto;}
+
+/* mode atmosphere tints */
+.case-sheet.mode-think{background:#FBF8F1;}
+.case-sheet.mode-discuss{background:#FCF6EC;}
+.case-sheet.mode-verdict{background:var(--paper-2);}
+.case-sheet.mode-evidence{background:var(--paper-2);}
+.case-sheet.mode-locked{background:#F8F6F0;}
+
+/* Right panel */
+.panel{
+  background:var(--paper-2);
+  border:1px solid var(--line);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow-sm);
+  padding:1.6rem 1.7rem 1.7rem;
+  min-height:420px;
+  display:flex;flex-direction:column;
+  animation:panelIn var(--dur-panel) var(--ease);
+}
+@keyframes panelIn{
+  from{opacity:0;transform:translateY(8px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.panel-kicker{font-size:.78rem;color:var(--ink-soft);margin-bottom:.3rem;}
+.panel h2{font-size:1.35rem;margin-bottom:.4rem;}
+.panel-instruction{color:var(--ink-soft);font-size:.94rem;margin-bottom:1.1rem;}
+
+/* timer */
+.timer{margin:.2rem 0 1.2rem;}
+.timer-track{height:4px;background:var(--line-soft);border-radius:99px;overflow:hidden;}
+.timer-fill{height:100%;background:var(--teal);border-radius:99px;transform-origin:left center;transition:transform 260ms linear;}
+body.lang-ar .timer-fill{transform-origin:right center;}
+.timer-label{font-size:.76rem;color:var(--ink-soft);margin-top:.4rem;}
+
+/* discussion prompts */
+.prompt-list{list-style:none;margin:0 0 1.3rem;padding:0;display:flex;flex-direction:column;gap:.65rem;}
+.prompt-list li{
+  display:flex;gap:.6rem;align-items:flex-start;font-size:.98rem;color:var(--ink);
+  background:var(--paper);border:1px solid var(--line-soft);border-radius:10px;padding:.7rem .85rem;
+}
+.prompt-list li .qmark{
+  flex:0 0 auto;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--navy);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;font-family:var(--font-serif);
+}
+
+/* Lens grid */
+.lens-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-bottom:1rem;}
+@media (max-width: 620px){.lens-grid{grid-template-columns:1fr;}}
+.lens-card{
+  text-align:start;border:1.5px solid var(--line);background:var(--paper-2);
+  border-radius:12px;padding:.9rem .8rem;cursor:pointer;
+  display:flex;flex-direction:column;gap:.55rem;
+  transition:transform var(--dur-micro) var(--ease), box-shadow var(--dur-micro) ease, border-color var(--dur-micro) ease, background var(--dur-micro) ease;
+}
+.lens-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm);}
+.lens-card .lens-icon{
+  width:2.2rem;height:2.2rem;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;
+}
+.lens-card[data-lens="ethics"] .lens-icon{background:var(--coral);}
+.lens-card[data-lens="manners"] .lens-icon{background:var(--teal);}
+.lens-card[data-lens="etiquette"] .lens-icon{background:var(--mustard);}
+.lens-card .lens-label{font-size:.92rem;font-weight:600;color:var(--navy);line-height:1.3;}
+.lens-card[aria-checked="true"][data-lens="ethics"]{border-color:var(--coral);background:var(--coral-tint);}
+.lens-card[aria-checked="true"][data-lens="manners"]{border-color:var(--teal);background:var(--teal-tint);}
+.lens-card[aria-checked="true"][data-lens="etiquette"]{border-color:var(--mustard);background:var(--mustard-tint);}
+
+.secondary-row{
+  margin:.2rem 0 1rem;padding:.85rem .9rem;background:var(--paper);border:1px dashed var(--line);border-radius:10px;
+}
+.secondary-row .sec-label{font-size:.82rem;color:var(--ink-soft);margin-bottom:.55rem;}
+.chip-row{display:flex;gap:.5rem;flex-wrap:wrap;}
+.chip{
+  border:1px solid var(--line);background:var(--paper-2);border-radius:999px;padding:.4rem .85rem;
+  font-size:.82rem;cursor:pointer;color:var(--ink);transition:all var(--dur-micro) ease;
+}
+.chip[aria-checked="true"]{background:var(--navy);border-color:var(--navy);color:#fff;}
+
+/* evidence selection readback */
+.evidence-picked{list-style:none;margin:0 0 1rem;padding:0;display:flex;flex-direction:column;gap:.5rem;min-height:2.2rem;}
+.evidence-picked li{
+  display:flex;align-items:center;gap:.5rem;background:var(--paper);border:1px solid var(--line-soft);
+  border-radius:8px;padding:.45rem .7rem;font-size:.88rem;
+}
+.evidence-picked li .rm{
+  margin-inline-start:auto;border:none;background:none;cursor:pointer;color:var(--ink-soft);
+  width:1.4rem;height:1.4rem;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  flex:0 0 auto;
+}
+.evidence-picked li .rm:hover{background:var(--line-soft);color:var(--ink);}
+.evidence-empty{font-size:.85rem;color:var(--ink-soft);font-style:italic;}
+body.lang-ar .evidence-empty{font-style:normal;}
+
+.validation-msg{
+  font-size:.85rem;color:var(--coral-text);background:var(--coral-tint);border-radius:8px;
+  padding:.55rem .75rem;margin-bottom:.9rem;
+}
+
+.panel-footer{margin-top:auto;display:flex;justify-content:flex-end;gap:.6rem;padding-top:.6rem;}
+
+/* Buttons */
+.btn{
+  border:none;border-radius:9px;padding:.72rem 1.3rem;font-size:.95rem;font-weight:600;cursor:pointer;
+  transition:transform var(--dur-micro) var(--ease), box-shadow var(--dur-micro) ease, background var(--dur-micro) ease;
+}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy-2);box-shadow:var(--shadow-sm);}
+.btn-ghost{background:transparent;color:var(--navy);border:1px solid var(--line);}
+.btn-ghost:hover{background:var(--paper);}
+.btn:active{transform:scale(.98);}
+
+/* Locked / decision recap */
+.decision-card{
+  border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.15rem;background:var(--paper);
+  animation:lockIn var(--dur-panel) var(--ease);
+}
+@keyframes lockIn{
+  from{opacity:0;transform:translateY(10px) scale(.98);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+.decision-lens-tag{
+  display:inline-flex;align-items:center;gap:.5rem;font-weight:600;color:var(--navy);
+  background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:.35rem .8rem;font-size:.85rem;
+  margin-bottom:.7rem;
+}
+.decision-lens-tag .dot{width:.6rem;height:.6rem;border-radius:50%;}
+.decision-evidence{font-size:.9rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:.35rem;margin-bottom:.8rem;}
+.decision-note{font-size:.88rem;color:var(--ink-soft);border-top:1px solid var(--line-soft);padding-top:.7rem;}
+
+/* ======================================================================
+   CENTERED SCREENS (home / pause / reveal / review)
+   ====================================================================== */
+.screen-center{display:flex;flex-direction:column;align-items:center;padding:1.2rem 0 2rem;}
+.screen-card{
+  max-width:760px;width:100%;background:var(--paper-2);border:1px solid var(--line);
+  border-radius:var(--radius-card);box-shadow:var(--shadow-md);padding:2.4rem 2.4rem 2.2rem;
+  animation:panelIn var(--dur-panel) var(--ease);
+}
+.screen-card h2{font-size:1.6rem;margin-bottom:.8rem;}
+.screen-card p{color:var(--ink-soft);font-size:1.02rem;line-height:1.65;}
+.screen-card p + p{margin-top:.7rem;}
+.screen-actions{margin-top:1.6rem;display:flex;gap:.8rem;flex-wrap:wrap;}
+.home-note{
+  margin-top:1.4rem;padding:.9rem 1rem;background:var(--paper);border-radius:10px;
+  border:1px solid var(--line-soft);font-size:.88rem;color:var(--ink-soft);display:flex;gap:.65rem;
+}
+
+.afterlearning-block{
+  margin-top:1.8rem;padding:1.3rem 1.4rem;border:1.5px dashed var(--line);border-radius:12px;background:var(--paper);
+}
+.afterlearning-block .al-label{
+  font-size:.78rem;letter-spacing:.02em;color:var(--mustard);font-weight:700;margin-bottom:.5rem;
+}
+.afterlearning-block p{color:var(--ink);font-size:.95rem;}
+
+/* Reveal morph cards */
+.reveal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.6rem 0 1.2rem;}
+@media (max-width: 680px){.reveal-grid{grid-template-columns:1fr;}}
+.morph-card{perspective:1200px;height:150px;}
+.morph-inner{
+  position:relative;width:100%;height:100%;transform-style:preserve-3d;
+  transition:transform 700ms var(--ease);
+}
+.morph-card.flipped .morph-inner{transform:rotateY(180deg);}
+.morph-face{
+  position:absolute;inset:0;backface-visibility:hidden;border-radius:12px;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:.5rem;
+  padding:1.1rem 1.05rem;border:1.5px solid var(--line);
+}
+.morph-face.front{background:var(--paper-2);}
+.morph-face.back{transform:rotateY(180deg);color:#fff;}
+.morph-face .lens-icon{width:2rem;height:2rem;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;}
+.morph-card[data-lens="ethics"] .front .lens-icon{background:var(--coral);}
+.morph-card[data-lens="manners"] .front .lens-icon{background:var(--teal);}
+.morph-card[data-lens="etiquette"] .front .lens-icon{background:var(--mustard);}
+.morph-card[data-lens="ethics"] .back{background:var(--coral);}
+.morph-card[data-lens="manners"] .back{background:var(--teal);}
+.morph-card[data-lens="etiquette"] .back{background:var(--mustard);}
+.morph-face .face-label{font-weight:600;font-size:.98rem;line-height:1.3;color:var(--navy);}
+.morph-face.back .face-label{color:#fff;font-family:var(--font-serif);font-size:1.35rem;}
+body.lang-ar .morph-face.back .face-label{font-family:var(--font-ar);}
+.morph-face.back .face-icon-only{opacity:.85;}
+
+.reveal-sub{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.3rem;
+  opacity:0;transition:opacity var(--dur-panel) ease;
+}
+.reveal-sub.show{opacity:1;}
+@media (max-width: 680px){.reveal-sub{grid-template-columns:1fr;}}
+.reveal-sub div{font-size:.85rem;color:var(--ink-soft);padding:0 .2rem;}
+
+.reveal-quote{
+  font-family:var(--font-serif);font-style:italic;font-size:1.2rem;color:var(--navy);
+  text-align:center;max-width:52ch;margin:.4rem auto 0;line-height:1.5;
+  opacity:0;transition:opacity 600ms ease;
+}
+body.lang-ar .reveal-quote{font-style:normal;}
+.reveal-quote.show{opacity:1;}
+.reveal-cta{display:flex;justify-content:center;margin-top:1.6rem;opacity:0;transition:opacity 500ms ease;}
+.reveal-cta.show{opacity:1;}
+
+/* Review list */
+.review-list{display:flex;flex-direction:column;gap:.9rem;margin-top:1.6rem;}
+.review-card{
+  border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.2rem;background:var(--paper-2);
+}
+.review-card-top{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;}
+.review-tag{font-family:var(--font-serif);font-style:italic;color:var(--navy);font-size:1rem;}
+body.lang-ar .review-tag{font-style:normal;font-weight:600;}
+.review-lens-chip{
+  margin-inline-start:auto;display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:600;
+  padding:.3rem .7rem;border-radius:999px;color:#fff;
+}
+.review-lens-chip.ethics{background:var(--coral);}
+.review-lens-chip.manners{background:var(--teal);}
+.review-lens-chip.etiquette{background:var(--mustard);}
+.review-recap{font-size:.92rem;color:var(--ink-soft);margin-top:.6rem;line-height:1.55;}
+.review-status{font-size:.8rem;color:var(--teal);margin-top:.5rem;font-weight:600;}
+.review-actions{display:flex;gap:.6rem;margin-top:.85rem;}
+.review-edit{
+  margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line-soft);
+}
+
+/* Case scenario reused inside review edit (smaller) */
+.review-scenario{font-size:1.02rem;line-height:1.6;margin-bottom:.9rem;}
+
+/* Modal */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(20,20,58,.4);display:flex;align-items:center;justify-content:center;
+  padding:1.5rem;z-index:50;
+}
+.modal{
+  max-width:420px;width:100%;background:var(--paper-2);border-radius:14px;box-shadow:var(--shadow-lg);
+  padding:1.6rem 1.7rem;
+}
+.modal h3{font-size:1.15rem;margin-bottom:.6rem;}
+.modal p{color:var(--ink-soft);font-size:.94rem;}
+.modal-actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.3rem;}
+
+/* icon svg baseline */
+.icon{width:1.1rem;height:1.1rem;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.icon-lg{width:1.3rem;height:1.3rem;}
+
+@media (max-width:720px){
+  .topbar{padding:.8rem 1.1rem;flex-wrap:wrap;row-gap:.6rem;}
+  .hero,main{padding-left:1.1rem;padding-right:1.1rem;}
+  .screen-card{padding:1.6rem 1.4rem;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ======================================================================
+   STORAGE (with in-memory fallback if sessionStorage unavailable)
+   ====================================================================== */
+var storageDegraded = false;
+var memoryStore = {};
+var storage = (function(){
+  try{
+    var testKey = "__wawg_test__";
+    sessionStorage.setItem(testKey, "1");
+    sessionStorage.removeItem(testKey);
+    return {
+      get:function(k){ return sessionStorage.getItem(k); },
+      set:function(k,v){ sessionStorage.setItem(k,v); },
+      remove:function(k){ sessionStorage.removeItem(k); }
+    };
+  }catch(e){
+    storageDegraded = true;
+    return {
+      get:function(k){ return Object.prototype.hasOwnProperty.call(memoryStore,k) ? memoryStore[k] : null; },
+      set:function(k,v){ memoryStore[k]=v; },
+      remove:function(k){ delete memoryStore[k]; }
+    };
+  }
+})();
+
+var STORAGE_KEY = "wawg_session_v1";
+
+/* ======================================================================
+   ICONS (inline, single-stroke line art)
+   ====================================================================== */
+var ICONS = {
+  scale:'<svg class="icon" viewBox="0 0 24 24"><path d="M12 3v14M7 6h10M4 10l3-4 3 4-3 3-3-3zM14 10l3-4 3 4-3 3-3-3zM7 20h10"/></svg>',
+  people:'<svg class="icon" viewBox="0 0 24 24"><path d="M8 11a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 6-5s6 2 6 5M16 11a3 3 0 100-6M22 20c0-2.5-2-4.5-5-5"/></svg>',
+  badge:'<svg class="icon" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg>',
+  clip:'<svg viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v20a5 5 0 01-10 0V8a3.2 3.2 0 016.4 0v13" stroke="#8a8266" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
+  close:'<svg class="icon" viewBox="0 0 24 24" style="width:.85rem;height:.85rem;"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  check:'<svg class="icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>'
+};
+
+/* ======================================================================
+   CONTENT DATA (bilingual, source-derived)
+   ====================================================================== */
+var LENS = {
+  ethics:{
+    icon:ICONS.scale,
+    phase1:{en:"What is right or wrong?", ar:"إيه اللي صح وإيه اللي غلط؟"},
+    phase2:{en:"Ethics", ar:"الأخلاقيات"},
+    sub:{en:"The internal code — what you believe is right and wrong.", ar:"القاعدة الداخلية، إيه اللي تعتقد إنه صح وإيه اللي غلط."}
+  },
+  manners:{
+    icon:ICONS.people,
+    phase1:{en:"Consideration of others", ar:"مراعاة الآخرين"},
+    phase2:{en:"Manners", ar:"حسن التعامل"},
+    sub:{en:"How you treat people — the daily acts of respect and consideration.", ar:"إزاي بتتعامل مع الناس، تفاصيل الاحترام والمراعاة في يومك."}
+  },
+  etiquette:{
+    icon:ICONS.badge,
+    phase1:{en:"Expected professional conduct", ar:"السلوك المهني المتوقع"},
+    phase2:{en:"Etiquette", ar:"الإتيكيت"},
+    sub:{en:"The accepted standards of behavior in a professional context.", ar:"المعايير المتعارف عليها للسلوك في بيئة الشغل."}
+  }
+};
+var LENS_ORDER = ["ethics","manners","etiquette"];
+
+var INCIDENTS = [
+  {
+    id:"inc1", num:1,
+    tag:{en:"The Exception", ar:"الاستثناء"},
+    scenario:{
+      en:[
+        ["t","A customer asks for "],["e","e1","an exception to the standard policy"],
+        ["t",". The employee "],["e","e2","knows this goes against the rule"],
+        ["t",", but "],["e","e3","agrees to it just this once"],
+        ["t",", wanting to "],["e","e4","help and keep the customer happy"],
+        ["t",". The customer "],["e","e5","leaves satisfied"],["t","."]
+      ],
+      ar:[
+        ["t","عميل بيطلب "],["e","e1","استثناء من القاعدة المعتادة"],
+        ["t","، والموظف "],["e","e2","عارف إن الاستثناء ده مخالف للقاعدة"],
+        ["t","، بس "],["e","e3","بيوافق عليه مرة واحدة بس"],
+        ["t"," عشان "],["e","e4","يساعد العميل ويخليه مبسوط"],
+        ["t",". العميل "],["e","e5","بيمشي وهو راضي"],["t","."]
+      ]
+    }
+  },
+  {
+    id:"inc2", num:2,
+    tag:{en:"Borrowed, Not Asked", ar:"مأخوذ من غير إذن"},
+    scenario:{
+      en:[
+        ["t","During a busy shift, an employee needs a stapler and "],
+        ["e","e1","takes it from a colleague's desk without asking"],
+        ["t",", since "],["e","e2","the colleague is away"],
+        ["t",". The employee "],["e","e3","uses it and puts it back"],
+        ["t"," "],["e","e4","before the colleague returns"],["t","."]
+      ],
+      ar:[
+        ["t","في نص يوم شغل مشغول، الموظف محتاج دباسة، ف"],
+        ["e","e1","بياخدها من على مكتب زميله من غير ما ياخد إذن"],
+        ["t","، لأن "],["e","e2","الزميل مش موجود"],
+        ["t",". الموظف "],["e","e3","بيستخدمها وبيرجعها"],
+        ["t"," "],["e","e4","قبل ما الزميل يرجع"],["t","."]
+      ]
+    }
+  },
+  {
+    id:"inc3", num:3,
+    tag:{en:"Right Answer, Wrong Tone", ar:"إجابة صح بأسلوب غلط"},
+    scenario:{
+      en:[
+        ["t","A colleague asks for help finding a document. The employee "],
+        ["e","e1","gives the correct answer immediately"],
+        ["t",", but "],["e","e2","in a sharp, dismissive tone"],
+        ["t",", then "],["e","e3","turns back to their screen"],
+        ["t"," "],["e","e4","without another word"],["t","."]
+      ],
+      ar:[
+        ["t","زميل بيسأل عن ملف معين. الموظف "],
+        ["e","e1","بيدّيله الإجابة الصح على طول"],
+        ["t","، بس "],["e","e2","بنبرة حادة ومستعجلة"],
+        ["t","، وبعدين "],["e","e3","بيرجع لشاشته"],
+        ["t"," "],["e","e4","من غير ما يكمل كلام"],["t","."]
+      ]
+    }
+  },
+  {
+    id:"inc4", num:4,
+    tag:{en:"Same Tone, Different Person", ar:"نفس الأسلوب مع الكل"},
+    scenario:{
+      en:[
+        ["t","A "],["e","e1","senior manager stops by"],
+        ["t"," an employee's desk with a question. The employee replies in "],
+        ["e","e2","the exact same casual, joking tone"],
+        ["t"," "],["e","e3","they use with close colleagues"],
+        ["t",", "],["e","e4","without adjusting to who is standing in front of them"],["t","."]
+      ],
+      ar:[
+        ["t",""],["e","e1","مدير كبير بيعدي على مكتب الموظف"],
+        ["t"," يسأله سؤال. الموظف بيرد "],
+        ["e","e2","بنفس النبرة العادية والهزار"],
+        ["t"," "],["e","e3","اللي بيستخدمها مع زمايله المقربين"],
+        ["t","، "],["e","e4","من غير ما يفرق في أسلوبه حسب اللي قدامه"],["t","."]
+      ]
+    }
+  },
+  {
+    id:"inc5", num:5,
+    tag:{en:"In Front of Everyone", ar:"قدام عيون الكل"},
+    scenario:{
+      en:[
+        ["t","In the customer area, an employee "],
+        ["e","e1","leans back with their feet up on the desk"],
+        ["t"," "],["e","e2","while a customer waits nearby"],
+        ["t",", "],["e","e3","laughing loudly with a colleague"],
+        ["t"," and "],["e","e4","paying little attention to who might be watching"],["t","."]
+      ],
+      ar:[
+        ["t","في منطقة استقبال العملاء، الموظف "],
+        ["e","e1","قاعد مرخي ورجليه فوق المكتب"],
+        ["t","، "],["e","e2","وعميل واقف مستني جنبه"],
+        ["t","، وهو "],["e","e3","بيضحك بصوت عالي مع زميله"],
+        ["t"," "],["e","e4","من غير ما ياخد باله مين ممكن يكون شايفه"],["t","."]
+      ]
+    }
+  }
+];
+
+function evidenceIdsOf(inc){
+  return inc.scenario.en.filter(function(seg){return seg[0]==="e";}).map(function(seg){return seg[1];});
+}
+
+var STR = {
+  activityTitle:{en:"What Actually Went Wrong?", ar:"إيه اللي حصل غلط؟"},
+  activitySub:{en:"Incident Review", ar:"مراجعة مواقف من الشغل"},
+  brandKicker:{en:"Business Etiquette – Frontline", ar:"إتيكيت الأعمال – خط أول"},
+  langEn:{en:"English", ar:"إنجليزي"},
+  langAr:{en:"العربية", ar:"العربية"},
+  resetLink:{en:"Start New Session", ar:"ابدأ من جديد"},
+  storageWarning:{en:"Your progress won't be saved after this page closes.", ar:"التقدم مش هيتحفظ بعد ما تقفلوا الصفحة."},
+
+  homeIntro1:{en:"Five short situations from everyday branch work. Look at each one, decide what's really going on, and back up your answer with something from the scene itself.",
+              ar:"خمس مواقف قصيرة من شغل الفرع اليومي. اتفرجوا على كل موقف، وحددوا إيه اللي حصل فعلاً، وادعموا رأيكم بجزء من الموقف نفسه."},
+  homeIntro2:{en:"There's no score and no single right answer here — just your team's read on what happened. Later, your trainer will connect it to three ideas you'll be using for the rest of this session.",
+              ar:"مفيش تقييم ومفيش إجابة واحدة صح هنا — بس رأي فريقكم في اللي حصل. وبعدين، المدرب هيربط كلامكم بثلاث أفكار هتستخدموها في باقي الجلسة."},
+  homeNote:{en:"One person in your group opens this and shares their screen. Everyone else watches and discusses out loud.",
+            ar:"شخص واحد من الجروب يفتح النشاط ده ويشير شاشته. الباقيين يتفرجوا ويشاركوا بالكلام."},
+  startActivity:{en:"Start the Activity", ar:"ابدأ النشاط"},
+
+  thinkKicker:{en:"Quiet moment", ar:"لحظة هدوء"},
+  thinkHeading:{en:"Think first", ar:"فكر لوحدك الأول"},
+  thinkBody:{en:"Take about 15 seconds on your own before anyone speaks.", ar:"خدوا حوالي 15 ثانية لوحدكم قبل ما حد يتكلم."},
+  startDiscussing:{en:"Start Discussing", ar:"ابدأ النقاش"},
+
+  discussKicker:{en:"Now, together", ar:"دلوقتي مع بعض"},
+  discussHeading:{en:"Team discussion", ar:"نقاش الفريق"},
+  discussPrompt1:{en:"What is the main concern here?", ar:"إيه المشكلة الأساسية هنا؟"},
+  discussPrompt2:{en:"What part of the situation made you see it that way?", ar:"إيه الجزء في الموقف اللي خلاك تشوفها كده؟"},
+  chooseVerdictCta:{en:"Choose Our Verdict", ar:"اختاروا القرار"},
+
+  verdictKicker:{en:"Team verdict", ar:"قرار الفريق"},
+  verdictHeading:{en:"Choose your team's verdict", ar:"اختاروا قرار الفريق"},
+  verdictInstruction:{en:"Pick the one lens that fits this case best.", ar:"اختاروا العدسة اللي تناسب الموقف ده أكتر من غيرها."},
+  secondaryLabel:{en:"A secondary concern too? (optional)", ar:"في مشكلة تانية كمان؟ (اختياري)"},
+  secondaryNone:{en:"No secondary concern", ar:"مفيش مشكلة تانية"},
+  continueToEvidence:{en:"Continue to Evidence", ar:"اختاروا الدليل"},
+  errChooseVerdict:{en:"Choose a team verdict first.", ar:"اختاروا القرار الأول."},
+
+  evidenceKicker:{en:"Prove it", ar:"الدليل"},
+  evidenceHeading:{en:"What made you choose this?", ar:"إيه اللي خلاكم تختاروا ده؟"},
+  evidenceInstruction:{en:"Tap one or two phrases in the case that back up your choice.", ar:"دوسوا على جملة أو اتنين في الموقف بيدعموا اختياركم."},
+  evidenceEmpty:{en:"No evidence selected yet — tap a phrase in the case.", ar:"لسه معملتوش اختيار — دوسوا على جزء من الموقف."},
+  evidenceCapNote:{en:"Up to two — tap a highlighted phrase again to swap it.", ar:"جملتين بحد أقصى — دوسوا على الجملة المظللة تاني عشان تغيروها."},
+  lockVerdict:{en:"Lock Team Verdict", ar:"أكد قرار الفريق"},
+  errChooseEvidence:{en:"Select at least one piece of evidence.", ar:"اختاروا دليل واحد على الأقل."},
+
+  lockedKicker:{en:"Recorded", ar:"اتسجل"},
+  lockedHeading:{en:"Team decision recorded", ar:"اتسجل قرار الفريق"},
+  lockedNote:{en:"Keep this in mind — we'll come back to it after the concepts are introduced.", ar:"افتكروا القرار ده، هنرجعله بعد ما نشرح المفاهيم."},
+  nextIncident:{en:"Next Incident", ar:"التالي"},
+  finishPart1:{en:"Finish Part 1", ar:"إنهاء الجزء الأول"},
+  backToCurrent:{en:"Back to Current Incident", ar:"الرجوع للحالة الحالية"},
+  secondaryAlsoLabel:{en:"Also noted:", ar:"وكمان لاحظوا:"},
+
+  timerReady:{en:"Take the time you need.", ar:"خدوا وقتكم لو محتاجين."},
+
+  pauseHeading:{en:"You have completed Part 1.", ar:"خلصتم الجزء الأول."},
+  pauseBody:{en:"Keep your decisions. Return to the activity when your trainer asks you to.", ar:"احتفظوا بقراراتكم، وارجعوا للنشاط لما المدرب يطلب منكم."},
+  afterLabel:{en:"After Learning", ar:"بعد الشرح"},
+  afterConfirm:{en:"Open this section when your trainer asks you to.", ar:"افتحوا الجزء ده بعد ما المدرب يطلب منكم."},
+  afterCta:{en:"Open After-Learning Part", ar:"فتح جزء ما بعد الشرح"},
+
+  revealHeading:{en:"The same three ideas, in their proper names", ar:"نفس الأفكار التلاتة، بأسمائها الحقيقية"},
+  revealBridge:{en:"Ethics is about what's inside — etiquette is how that shows up on the outside.",
+                ar:"الأخلاقيات جوه الإنسان، والإتيكيت هو اللي بيظهر في سلوكه بره."},
+  reviewCta:{en:"Review Your Decisions", ar:"مراجعة القرارات"},
+
+  reviewHeading:{en:"Would you keep your original decision or change it now?", ar:"بعد ما عرفتوا المفاهيم، هتفضلوا على نفس القرار ولا هتغيروه؟"},
+  reviewSub:{en:"Go through as many cases as feel useful — you don't need to revisit all five.",
+             ar:"راجعوا اللي حابين منها — مش لازم تراجعوا الخمسة كلهم."},
+  keepIt:{en:"Keep it", ar:"نفس القرار"},
+  changeIt:{en:"Change it", ar:"تغيير القرار"},
+  keptStatus:{en:"Kept as originally decided.", ar:"اتفق الفريق إنه يفضل على نفس القرار."},
+  changedStatus:{en:"Updated after the concepts were introduced.", ar:"اتغير القرار بعد ما اتشرحت المفاهيم."},
+  saveNewDecision:{en:"Save New Decision", ar:"حفظ القرار الجديد"},
+  cancelEdit:{en:"Cancel", ar:"إلغاء"},
+
+  resetTitle:{en:"Start a new session?", ar:"تبدأ جلسة جديدة؟"},
+  resetBody:{en:"This clears all decisions from this session for this device. It cannot be undone.", ar:"هيتم مسح كل القرارات في الجلسة دي على الجهاز ده. الخطوة دي مينفعش نرجع فيها."},
+  resetConfirm:{en:"Clear and Restart", ar:"مسح والبدء من جديد"},
+  resetCancel:{en:"Cancel", ar:"إلغاء"}
+};
+
+function t(key, lang){
+  var entry = STR[key];
+  if(!entry) return "";
+  return entry[lang] || entry.en;
+}
+
+/* ======================================================================
+   STATE
+   ====================================================================== */
+function freshIncidentState(){
+  return {phase:"think", primary:null, secondary:null, evidence:[], locked:false, reviewDecision:null, reviewEditing:false};
+}
+function freshState(){
+  var incidents = {};
+  INCIDENTS.forEach(function(inc){ incidents[inc.id] = freshIncidentState(); });
+  return {
+    version:1,
+    lang:"en",
+    view:"home", /* home | incident | pause | reveal | review */
+    currentIndex:0,
+    incidents:incidents,
+    part1Complete:false,
+    afterLearningUnlocked:false
+  };
+}
+function loadState(){
+  try{
+    var raw = storage.get(STORAGE_KEY);
+    if(!raw) return freshState();
+    var parsed = JSON.parse(raw);
+    if(!parsed || parsed.version !== 1) return freshState();
+    return parsed;
+  }catch(e){
+    return freshState();
+  }
+}
+function saveState(){
+  try{ storage.set(STORAGE_KEY, JSON.stringify(state)); }catch(e){ /* ignore */ }
+}
+
+var state = loadState();
+var modal = null; /* {type:"reset"} */
+var validation = {}; /* transient per-incident validation message keyed by incidentId */
+var timerRuntime = {}; /* incidentId -> {phase, startedAt, duration} kept in memory only */
+var revealPlayed = false;
+var reduceMotion = false;
+try{ reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
+
+function getIncidentData(id){
+  return INCIDENTS.filter(function(i){return i.id===id;})[0];
+}
+function currentIncident(){ return INCIDENTS[state.currentIndex]; }
+
+/* ======================================================================
+   RENDER HELPERS
+   ====================================================================== */
+function scenarioHTML(inc, lang, incState, interactive){
+  var segs = inc.scenario[lang];
+  var selected = incState.evidence;
+  return segs.map(function(seg){
+    if(seg[0]==="t"){ return seg[1]; }
+    var id = seg[1], text = seg[2];
+    var isSel = selected.indexOf(id) !== -1;
+    if(interactive){
+      return '<button type="button" class="ev" data-action="toggle-evidence" data-ev="'+id+'" data-inc="'+inc.id+'" aria-pressed="'+(isSel?"true":"false")+'">'+text+'</button>';
+    }
+    if(isSel){
+      return '<mark>'+text+'</mark>';
+    }
+    return '<span class="ev-plain">'+text+'</span>';
+  }).join("");
+}
+
+function lensIconChip(lensId){
+  return '<span class="lens-icon" data-lens="'+lensId+'">'+LENS[lensId].icon+'</span>';
+}
+
+function atmosphereDot(phase){
+  var colorMap = {think:"#9B8F6B", discuss:"#C1472E", verdict:"#1C7F73", evidence:"#AD7A16", locked:"#1C7F73"};
+  return colorMap[phase] || "#9B8F6B";
+}
+
+/* ======================================================================
+   TOP CHROME
+   ====================================================================== */
+var LOGO_SVG = '<svg width="99" height="33" viewBox="0 0 99 33" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M31.7043 0.694367V8.00083C31.7043 8.10685 31.6167 8.1952 31.5073 8.1952H28.3776C28.2682 8.1952 28.185 8.10685 28.185 8.00083V4.1709C28.185 4.15765 28.1719 4.1444 28.1543 4.1444H24.2805C24.1754 4.1444 24.0879 4.05605 24.0879 3.95003V0.694367C24.0879 0.588349 24.1754 0.5 24.2805 0.5H31.5073C31.6167 0.5 31.7043 0.588349 31.7043 0.694367Z" fill="#080828"/><path d="M31.7043 12.648V32.1775C31.7043 32.3542 31.5599 32.5 31.3848 32.5H0.315161C0.140072 32.5 0 32.3542 0 32.1775V0.822473C0 0.645775 0.140072 0.5 0.315161 0.5H19.8333C20.0084 0.5 20.1484 0.645775 20.1484 0.822473V12.3299H31.3848C31.5599 12.3299 31.7043 12.4713 31.7043 12.648Z" fill="#080828"/><path d="M40.9531 15.0249C39.173 15.0249 37.7416 14.7952 36.659 14.3358V12.264C37.2718 12.4937 37.9298 12.6807 38.6331 12.825C39.3393 12.9693 40.0411 13.0415 40.7386 13.0415C41.8329 13.0415 42.6543 12.9119 43.2029 12.6527C43.7516 12.3936 44.0259 11.8767 44.0259 11.1022C44.0259 10.6281 43.9121 10.2482 43.6844 9.96252C43.4568 9.67391 43.0789 9.42506 42.5507 9.21597C42.0255 9.00982 41.3003 8.79189 40.3753 8.56219C38.8957 8.17345 37.8569 7.68017 37.2587 7.08234C36.6604 6.48746 36.3613 5.66581 36.3613 4.6174C36.3613 3.39524 36.802 2.4396 37.6833 1.75048C38.5675 1.06136 39.885 0.716797 41.6359 0.716797C42.4326 0.716797 43.1825 0.774223 43.8858 0.889077C44.592 1.00393 45.1435 1.13351 45.5404 1.27781V3.34518C44.4607 2.92994 43.2657 2.72232 41.9554 2.72232C40.9312 2.72232 40.1345 2.85779 39.5655 3.12872C38.9935 3.40261 38.7075 3.89883 38.7075 4.6174C38.7075 5.03264 38.8082 5.36984 39.0096 5.629C39.208 5.88816 39.5523 6.1105 40.0426 6.29603C40.5358 6.48451 41.2157 6.69361 42.0824 6.92331C43.2059 7.20897 44.0784 7.55059 44.7 7.94816C45.3186 8.34279 45.752 8.8022 46 9.3264C46.248 9.85061 46.3721 10.4425 46.3721 11.1022C46.3721 12.3244 45.9241 13.283 45.0283 13.978C44.1324 14.6759 42.774 15.0249 40.9531 15.0249Z" fill="#080828"/><path d="M48.6348 14.8088V0.933594H50.9635V7.31239L56.8114 0.933594H59.5034L54.4434 6.53492L59.7179 14.8088H57.2404L52.9901 8.0236L50.9635 10.2191V14.8088H48.6348Z" fill="#080828"/><path d="M61.9805 14.8088V0.933594H64.3048V14.8088H61.9805Z" fill="#080828"/><path d="M66.998 14.8088V0.933594H69.3267V12.9976H76.3697V14.8088H66.998Z" fill="#080828"/><path d="M78.2031 14.8088V0.933594H80.5318V12.9976H87.5792V14.8088H78.2031Z" fill="#080828"/><path d="M93.5761 15.0249C91.796 15.0249 90.3661 14.7952 89.2864 14.3358V12.264C89.8963 12.4937 90.5543 12.6807 91.2605 12.825C91.9638 12.9693 92.6642 13.0415 93.3616 13.0415C94.4588 13.0415 95.2818 12.9119 95.8304 12.6527C96.3761 12.3936 96.6489 11.8767 96.6489 11.1022C96.6489 10.6281 96.5351 10.2482 96.3075 9.96252C96.0799 9.67391 95.7034 9.42506 95.1782 9.21597C94.65 9.00982 93.9234 8.79189 92.9983 8.56219C91.5188 8.17345 90.4799 7.68017 89.8817 7.08234C89.2835 6.48746 88.9844 5.66581 88.9844 4.6174C88.9844 3.39524 89.4265 2.4396 90.3107 1.75048C91.192 1.06136 92.5081 0.716797 94.2589 0.716797C95.0556 0.716797 95.807 0.774223 96.5132 0.889077C97.2165 1.00393 97.768 1.13351 98.1678 1.27781V3.34518C97.0852 2.92994 95.8887 2.72232 94.5785 2.72232C93.5542 2.72232 92.7576 2.85779 92.1885 3.12872C91.6195 3.40261 91.3349 3.89883 91.3349 4.6174C91.3349 5.03264 91.4342 5.36984 91.6326 5.629C91.834 5.88816 92.1798 6.1105 92.67 6.29603C93.1603 6.48451 93.8402 6.69361 94.7098 6.92331C95.8333 7.20897 96.7044 7.55059 97.323 7.94816C97.9417 8.34279 98.3765 8.8022 98.6274 9.3264C98.8755 9.85061 98.9995 10.4425 98.9995 11.1022C98.9995 12.3244 98.5516 13.283 97.6557 13.978C96.7569 14.6759 95.397 15.0249 93.5761 15.0249Z" fill="#080828"/><path fill-rule="evenodd" clip-rule="evenodd" d="M36.791 32.4963V18.6211H43.4488C44.8145 18.6211 45.8256 18.945 46.4822 19.5929C47.1359 20.2379 47.4627 21.1493 47.4627 22.3273C47.4627 23.0754 47.3139 23.7041 47.0162 24.2136C46.7157 24.7231 46.3173 25.1074 45.8213 25.3665C46.4895 25.5521 47.0192 25.8863 47.4102 26.3693C47.8012 26.8493 47.9967 27.5561 47.9967 28.4897C47.9967 29.8414 47.6378 30.8471 46.9199 31.5068C46.1992 32.1665 45.1428 32.4963 43.7508 32.4963H36.791ZM39.1153 24.5493H43.1293C43.9113 24.5493 44.4702 24.3652 44.8057 23.9971C45.1413 23.632 45.3091 23.1401 45.3091 22.5217C45.3091 21.8031 45.1384 21.2686 44.797 20.9182C44.4526 20.5648 43.8121 20.3881 42.8754 20.3881H39.1153V24.5493ZM39.1153 30.7779H43.2562C44.082 30.7779 44.6876 30.6012 45.0728 30.2478C45.4579 29.8974 45.6505 29.2833 45.6505 28.4057C45.6505 27.6901 45.4609 27.1556 45.0815 26.8022C44.7051 26.4518 44.0193 26.2765 43.0242 26.2765H39.1153V30.7779Z" fill="#080828"/><path fill-rule="evenodd" clip-rule="evenodd" d="M49.1074 32.4963L54.3601 18.6211H56.9646L62.1735 32.4963H59.7791L58.4134 28.9226H52.885L51.5193 32.4963H49.1074ZM53.2483 27.1114H58.0326L55.6383 20.7547L53.2483 27.1114Z" fill="#080828"/><path d="M64.4551 32.4963V18.6211H66.508L73.6779 28.8342V18.6211H75.9847V32.4963H73.9362L66.7838 22.3052V32.4963H64.4551Z" fill="#080828"/><path d="M78.6992 32.4963V18.6211H81.0235V24.9999L86.8759 18.6211H89.5635L84.5034 24.2224L89.778 32.4963H87.3005L83.0546 25.7111L81.0235 27.9066V32.4963H78.6992Z" fill="#080828"/></svg>';
+
+function renderTopbar(){
+  var L = state.lang;
+  return ''+
+  '<header class="topbar">'+
+    '<div class="brand">'+
+      '<span class="brand-logo">'+LOGO_SVG+'</span>'+
+      '<span class="brand-kicker">'+t("brandKicker",L)+'</span>'+
+    '</div>'+
+    '<div class="topbar-actions">'+
+      (storageDegraded ? '<span class="storage-note">'+t("storageWarning",L)+'</span>' : '')+
+      '<div class="lang-switch" role="group" aria-label="Language / اللغة">'+
+        '<button type="button" data-action="set-lang" data-lang="en" aria-pressed="'+(L==="en"?"true":"false")+'">EN</button>'+
+        '<button type="button" data-action="set-lang" data-lang="ar" aria-pressed="'+(L==="ar"?"true":"false")+'">AR</button>'+
+      '</div>'+
+      '<button type="button" class="reset-link" data-action="open-reset">'+t("resetLink",L)+'</button>'+
+    '</div>'+
+  '</header>';
+}
+
+function renderHero(){
+  var L = state.lang;
+  return ''+
+  '<div class="hero">'+
+    '<h1>'+t("activityTitle",L)+'</h1>'+
+    '<p class="hero-sub">'+t("activitySub",L)+'</p>'+
+  '</div>';
+}
+
+function frontierIndex(){
+  for(var i=0;i<INCIDENTS.length;i++){
+    if(!state.incidents[INCIDENTS[i].id].locked) return i;
+  }
+  return INCIDENTS.length;
+}
+
+function renderCaseTabs(){
+  var L = state.lang;
+  var html = '<nav class="case-tabs" role="tablist" aria-label="Incidents">';
+  INCIDENTS.forEach(function(inc, idx){
+    var incState = state.incidents[inc.id];
+    var isActive = (idx === state.currentIndex && state.view === "incident");
+    var isLocked = incState.locked;
+    var cls = "case-tab";
+    if(isActive) cls += " active";
+    if(isLocked) cls += " done";
+    if(!isActive && !isLocked) cls += " locked";
+    var clickable = isLocked && !isActive;
+    html += '<button type="button" class="'+cls+'" role="tab" '+
+            (clickable ? 'data-action="goto-incident" data-idx="'+idx+'"' : 'disabled aria-disabled="true"')+
+            ' aria-selected="'+(idx===state.currentIndex?"true":"false")+'">'+
+            '<span class="num">'+(isLocked ? ICONS.check.replace('class="icon"','style="width:.7rem;height:.7rem;stroke:#fff;"') : inc.num)+'</span>'+
+            '<span>'+inc.tag[L]+'</span>'+
+            '</button>';
+  });
+  html += '</nav>';
+  return html;
+}
+
+/* ======================================================================
+   HOME VIEW
+   ====================================================================== */
+function renderHome(){
+  var L = state.lang;
+  return ''+
+  '<div class="screen-center">'+
+    '<div class="screen-card">'+
+      '<p>'+t("homeIntro1",L)+'</p>'+
+      '<p>'+t("homeIntro2",L)+'</p>'+
+      '<div class="home-note">'+ICONS.people+'<span>'+t("homeNote",L)+'</span></div>'+
+      '<div class="screen-actions">'+
+        '<button type="button" class="btn btn-primary" data-action="start-part1">'+t("startActivity",L)+'</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ======================================================================
+   INCIDENT VIEW
+   ====================================================================== */
+function ensureTimer(incId, phase, durationMs){
+  var rt = timerRuntime[incId];
+  if(!rt || rt.phase !== phase){
+    timerRuntime[incId] = {phase:phase, startedAt:Date.now(), duration:durationMs};
+  }
+}
+function timerRemainingRatio(incId){
+  var rt = timerRuntime[incId];
+  if(!rt) return 0;
+  var elapsed = Date.now() - rt.startedAt;
+  var ratio = 1 - (elapsed / rt.duration);
+  if(ratio < 0) ratio = 0;
+  return ratio;
+}
+function timerDone(incId){
+  var rt = timerRuntime[incId];
+  if(!rt) return true;
+  return (Date.now() - rt.startedAt) >= rt.duration;
+}
+
+function renderIncidentView(){
+  var L = state.lang;
+  var inc = currentIncident();
+  var incState = state.incidents[inc.id];
+  var phase = incState.phase;
+
+  var sheetMode = "mode-" + phase;
+  var scenarioInteractive = (phase === "evidence");
+  var scenario = scenarioHTML(inc, L, incState, scenarioInteractive);
+
+  var atmosphereText = {
+    think:t("thinkHeading",L), discuss:t("discussHeading",L),
+    verdict:t("verdictKicker",L), evidence:t("evidenceKicker",L), locked:t("lockedKicker",L)
+  }[phase];
+
+  var caseSheet = ''+
+  '<div class="case-sheet '+sheetMode+'">'+
+    '<span class="case-clip">'+ICONS.clip+'</span>'+
+    '<div class="case-number">'+(L==="ar" ? ("حالة " + inc.num + " من 5") : ("Incident " + inc.num + " of 5"))+'</div>'+
+    '<div class="case-tag">'+inc.tag[L]+'</div>'+
+    '<p class="case-scenario">'+scenario+'</p>'+
+    '<div class="case-atmosphere"><span class="dot" style="background:'+atmosphereDot(phase)+'"></span><span>'+atmosphereText+'</span></div>'+
+  '</div>';
+
+  var panel = "";
+  if(phase === "think"){
+    ensureTimer(inc.id, "think", 15000);
+    panel = renderThinkPanel(L, inc);
+  } else if(phase === "discuss"){
+    ensureTimer(inc.id, "discuss", 45000);
+    panel = renderDiscussPanel(L, inc);
+  } else if(phase === "verdict"){
+    panel = renderVerdictPanel(L, inc, incState);
+  } else if(phase === "evidence"){
+    panel = renderEvidencePanel(L, inc, incState);
+  } else if(phase === "locked"){
+    panel = renderLockedPanel(L, inc, incState);
+  }
+
+  return ''+
+  renderCaseTabs()+
+  '<div class="incident-grid">'+
+    caseSheet+
+    panel+
+  '</div>';
+}
+
+function renderTimerBar(incId, label){
+  var ratio = timerRemainingRatio(incId);
+  var pct = Math.round(ratio*100);
+  var done = timerDone(incId);
+  return ''+
+  '<div class="timer" data-timer-for="'+incId+'">'+
+    '<div class="timer-track"><div class="timer-fill" style="transform:scaleX('+(pct/100)+')"></div></div>'+
+    '<div class="timer-label">'+(done ? t("timerReady", state.lang) : label)+'</div>'+
+  '</div>';
+}
+
+function renderThinkPanel(L, inc){
+  return ''+
+  '<div class="panel">'+
+    '<p class="panel-kicker">'+t("thinkKicker",L)+'</p>'+
+    '<h2>'+t("thinkHeading",L)+'</h2>'+
+    '<p class="panel-instruction">'+t("thinkBody",L)+'</p>'+
+    renderTimerBar(inc.id, "")+
+    '<div class="panel-footer">'+
+      '<button type="button" class="btn btn-primary" data-action="advance-phase" data-to="discuss">'+t("startDiscussing",L)+'</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderDiscussPanel(L, inc){
+  return ''+
+  '<div class="panel">'+
+    '<p class="panel-kicker">'+t("discussKicker",L)+'</p>'+
+    '<h2>'+t("discussHeading",L)+'</h2>'+
+    '<ul class="prompt-list">'+
+      '<li><span class="qmark">”</span><span>'+t("discussPrompt1",L)+'</span></li>'+
+      '<li><span class="qmark">”</span><span>'+t("discussPrompt2",L)+'</span></li>'+
+    '</ul>'+
+    renderTimerBar(inc.id, "")+
+    '<div class="panel-footer">'+
+      '<button type="button" class="btn btn-primary" data-action="advance-phase" data-to="verdict">'+t("chooseVerdictCta",L)+'</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderVerdictPanel(L, inc, incState){
+  var lensCards = LENS_ORDER.map(function(id){
+    var checked = incState.primary === id;
+    return '<button type="button" class="lens-card" role="radio" aria-checked="'+(checked?"true":"false")+'" data-lens="'+id+'" data-action="choose-primary" data-lens-id="'+id+'">'+
+      lensIconChip(id)+
+      '<span class="lens-label">'+LENS[id].phase1[L]+'</span>'+
+      '</button>';
+  }).join("");
+
+  var secondaryHTML = "";
+  if(incState.primary){
+    var remaining = LENS_ORDER.filter(function(id){return id !== incState.primary;});
+    var chips = remaining.map(function(id){
+      var checked = incState.secondary === id;
+      return '<button type="button" class="chip" role="radio" aria-checked="'+(checked?"true":"false")+'" data-action="choose-secondary" data-lens-id="'+id+'">'+LENS[id].phase1[L]+'</button>';
+    }).join("");
+    var noneChecked = (incState.secondary === null || incState.secondary === "none");
+    chips += '<button type="button" class="chip" role="radio" aria-checked="'+(noneChecked?"true":"false")+'" data-action="choose-secondary" data-lens-id="none">'+t("secondaryNone",L)+'</button>';
+    secondaryHTML = ''+
+    '<div class="secondary-row" role="radiogroup" aria-label="'+t("secondaryLabel",L)+'">'+
+      '<p class="sec-label">'+t("secondaryLabel",L)+'</p>'+
+      '<div class="chip-row">'+chips+'</div>'+
+    '</div>';
+  }
+
+  var err = validation[inc.id] === "verdict" ? '<p class="validation-msg" role="alert">'+t("errChooseVerdict",L)+'</p>' : "";
+
+  return ''+
+  '<div class="panel">'+
+    '<p class="panel-kicker">'+t("verdictKicker",L)+'</p>'+
+    '<h2>'+t("verdictHeading",L)+'</h2>'+
+    '<p class="panel-instruction">'+t("verdictInstruction",L)+'</p>'+
+    '<div class="lens-grid" role="radiogroup" aria-label="'+t("verdictHeading",L)+'">'+lensCards+'</div>'+
+    secondaryHTML+
+    err+
+    '<div class="panel-footer">'+
+      '<button type="button" class="btn btn-primary" data-action="advance-phase" data-to="evidence">'+t("continueToEvidence",L)+'</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderEvidencePanel(L, inc, incState){
+  var pickedHTML = "";
+  if(incState.evidence.length === 0){
+    pickedHTML = '<p class="evidence-empty">'+t("evidenceEmpty",L)+'</p>';
+  } else {
+    pickedHTML = '<ul class="evidence-picked">'+incState.evidence.map(function(evId){
+      var seg = inc.scenario[L].filter(function(s){return s[0]==="e" && s[1]===evId;})[0];
+      var text = seg ? seg[2] : evId;
+      return '<li>'+ICONS.check+'<span>'+text+'</span><button type="button" class="rm" data-action="toggle-evidence" data-ev="'+evId+'" data-inc="'+inc.id+'" aria-label="remove">'+ICONS.close+'</button></li>';
+    }).join("")+'</ul>';
+  }
+  var err = validation[inc.id] === "evidence" ? '<p class="validation-msg" role="alert">'+t("errChooseEvidence",L)+'</p>' : "";
+
+  return ''+
+  '<div class="panel">'+
+    '<p class="panel-kicker">'+t("evidenceKicker",L)+'</p>'+
+    '<h2>'+t("evidenceHeading",L)+'</h2>'+
+    '<p class="panel-instruction">'+t("evidenceInstruction",L)+'</p>'+
+    pickedHTML+
+    '<p class="panel-instruction" style="margin-top:-.4rem;">'+t("evidenceCapNote",L)+'</p>'+
+    err+
+    '<div class="panel-footer">'+
+      '<button type="button" class="btn btn-primary" data-action="lock-verdict">'+t("lockVerdict",L)+'</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderLockedPanel(L, inc, incState){
+  var lensId = incState.primary;
+  var evidenceText = incState.evidence.map(function(evId){
+    var seg = inc.scenario[L].filter(function(s){return s[0]==="e" && s[1]===evId;})[0];
+    return seg ? '“'+seg[2]+'”' : "";
+  });
+  var secondaryLine = "";
+  if(incState.secondary && incState.secondary !== "none"){
+    secondaryLine = '<div>'+t("secondaryAlsoLabel",L)+' '+LENS[incState.secondary].phase1[L]+'</div>';
+  }
+  var trueFrontier = frontierIndex();
+  var isLast = state.currentIndex === INCIDENTS.length - 1;
+  var isReviewingPast = state.currentIndex !== (trueFrontier - 1);
+  var footerBtn;
+  if(isReviewingPast){
+    footerBtn = '<button type="button" class="btn btn-primary" data-action="return-to-frontier">'+t("backToCurrent",L)+'</button>';
+  } else {
+    footerBtn = '<button type="button" class="btn btn-primary" data-action="'+(isLast ? "finish-part1" : "next-incident")+'">'+(isLast ? t("finishPart1",L) : t("nextIncident",L))+'</button>';
+  }
+  return ''+
+  '<div class="panel">'+
+    '<p class="panel-kicker">'+t("lockedKicker",L)+'</p>'+
+    '<h2>'+t("lockedHeading",L)+'</h2>'+
+    '<div class="decision-card">'+
+      '<span class="decision-lens-tag"><span class="dot" style="background:'+atmosphereDot("verdict")+'"></span>'+LENS[lensId].phase1[L]+'</span>'+
+      '<div class="decision-evidence">'+evidenceText.map(function(e){return '<div>'+e+'</div>';}).join("")+secondaryLine+'</div>'+
+      '<p class="decision-note">'+(isReviewingPast ? "" : t("lockedNote",L))+'</p>'+
+    '</div>'+
+    '<div class="panel-footer">'+footerBtn+'</div>'+
+  '</div>';
+}
+
+/* ======================================================================
+   PAUSE VIEW
+   ====================================================================== */
+function renderPause(){
+  var L = state.lang;
+  return ''+
+  '<div class="screen-center">'+
+    '<div class="screen-card">'+
+      '<h2>'+t("pauseHeading",L)+'</h2>'+
+      '<p>'+t("pauseBody",L)+'</p>'+
+      '<div class="afterlearning-block">'+
+        '<p class="al-label">'+t("afterLabel",L)+'</p>'+
+        '<p>'+t("afterConfirm",L)+'</p>'+
+        '<div class="screen-actions">'+
+          '<button type="button" class="btn btn-primary" data-action="open-afterlearning">'+t("afterCta",L)+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ======================================================================
+   REVEAL VIEW
+   ====================================================================== */
+function renderReveal(){
+  var L = state.lang;
+  var cards = LENS_ORDER.map(function(id){
+    return ''+
+    '<div class="morph-card" data-lens="'+id+'">'+
+      '<div class="morph-inner">'+
+        '<div class="morph-face front">'+
+          lensIconChip(id)+
+          '<span class="face-label">'+LENS[id].phase1[L]+'</span>'+
+        '</div>'+
+        '<div class="morph-face back">'+
+          '<span class="face-icon-only">'+LENS[id].icon+'</span>'+
+          '<span class="face-label">'+LENS[id].phase2[L]+'</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+
+  var subLines = LENS_ORDER.map(function(id){
+    return '<div>'+LENS[id].sub[L]+'</div>';
+  }).join("");
+
+  return ''+
+  '<div class="screen-center">'+
+    '<div class="screen-card" style="max-width:880px;">'+
+      '<h2 style="text-align:center;">'+t("revealHeading",L)+'</h2>'+
+      '<div class="reveal-grid" id="reveal-grid">'+cards+'</div>'+
+      '<div class="reveal-sub" id="reveal-sub">'+subLines+'</div>'+
+      '<p class="reveal-quote" id="reveal-quote">'+t("revealBridge",L)+'</p>'+
+      '<div class="reveal-cta" id="reveal-cta">'+
+        '<button type="button" class="btn btn-primary" data-action="goto-review">'+t("reviewCta",L)+'</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function playRevealSequence(){
+  var delays = reduceMotion ? [0,0,0,0] : [400,750,1100,1700];
+  var grid = document.getElementById("reveal-grid");
+  if(!grid) return;
+  var cards = grid.querySelectorAll(".morph-card");
+  cards.forEach(function(card, i){
+    setTimeout(function(){ card.classList.add("flipped"); }, reduceMotion ? 0 : (300 + i*350));
+  });
+  setTimeout(function(){
+    var sub = document.getElementById("reveal-sub");
+    if(sub) sub.classList.add("show");
+  }, reduceMotion ? 0 : 1500);
+  setTimeout(function(){
+    var q = document.getElementById("reveal-quote");
+    if(q) q.classList.add("show");
+  }, reduceMotion ? 0 : 2000);
+  setTimeout(function(){
+    var cta = document.getElementById("reveal-cta");
+    if(cta) cta.classList.add("show");
+  }, reduceMotion ? 0 : 2500);
+}
+
+/* ======================================================================
+   REVIEW VIEW
+   ====================================================================== */
+function renderReview(){
+  var L = state.lang;
+  var cards = INCIDENTS.map(function(inc){
+    var incState = state.incidents[inc.id];
+    var lensId = incState.primary;
+    var editing = incState.reviewEditing;
+    var statusHTML = "";
+    if(incState.reviewDecision === "kept"){
+      statusHTML = '<p class="review-status">'+t("keptStatus",L)+'</p>';
+    } else if(incState.reviewDecision === "changed"){
+      statusHTML = '<p class="review-status">'+t("changedStatus",L)+'</p>';
+    }
+
+    var actionsHTML = editing ? "" : ''+
+      '<div class="review-actions">'+
+        '<button type="button" class="btn btn-ghost" data-action="review-keep" data-inc="'+inc.id+'">'+t("keepIt",L)+'</button>'+
+        '<button type="button" class="btn btn-ghost" data-action="review-edit-open" data-inc="'+inc.id+'">'+t("changeIt",L)+'</button>'+
+      '</div>';
+
+    var editHTML = "";
+    if(editing){
+      var scenario = scenarioHTML(inc, L, incState, true);
+      var lensCards = LENS_ORDER.map(function(id){
+        var checked = incState.primary === id;
+        return '<button type="button" class="lens-card" role="radio" aria-checked="'+(checked?"true":"false")+'" data-lens="'+id+'" data-action="review-choose-primary" data-inc="'+inc.id+'" data-lens-id="'+id+'">'+
+          lensIconChip(id)+'<span class="lens-label">'+LENS[id].phase2[L]+'</span>'+
+          '</button>';
+      }).join("");
+      var pickedHTML = incState.evidence.length === 0
+        ? '<p class="evidence-empty">'+t("evidenceEmpty",L)+'</p>'
+        : '<ul class="evidence-picked">'+incState.evidence.map(function(evId){
+            var seg = inc.scenario[L].filter(function(s){return s[0]==="e" && s[1]===evId;})[0];
+            return '<li>'+ICONS.check+'<span>'+(seg?seg[2]:evId)+'</span><button type="button" class="rm" data-action="toggle-evidence" data-ev="'+evId+'" data-inc="'+inc.id+'" aria-label="remove">'+ICONS.close+'</button></li>';
+          }).join("")+'</ul>';
+      var err = validation["review_"+inc.id] ? '<p class="validation-msg" role="alert">'+t(validation["review_"+inc.id]==="verdict"?"errChooseVerdict":"errChooseEvidence",L)+'</p>' : "";
+
+      editHTML = ''+
+      '<div class="review-edit" data-inc-scope="'+inc.id+'">'+
+        '<p class="review-scenario">'+scenario+'</p>'+
+        '<div class="lens-grid" role="radiogroup">'+lensCards+'</div>'+
+        pickedHTML+
+        err+
+        '<div class="review-actions">'+
+          '<button type="button" class="btn btn-primary" data-action="review-save" data-inc="'+inc.id+'">'+t("saveNewDecision",L)+'</button>'+
+          '<button type="button" class="btn btn-ghost" data-action="review-edit-cancel" data-inc="'+inc.id+'">'+t("cancelEdit",L)+'</button>'+
+        '</div>'+
+      '</div>';
+    }
+
+    return ''+
+    '<div class="review-card">'+
+      '<div class="review-card-top">'+
+        '<span class="review-tag">'+inc.tag[L]+'</span>'+
+        '<span class="review-lens-chip '+lensId+'">'+LENS[lensId].phase2[L]+'</span>'+
+      '</div>'+
+      (editing ? "" : '<p class="review-recap">'+scenarioHTML(inc, L, incState, false)+'</p>')+
+      statusHTML+
+      actionsHTML+
+      editHTML+
+    '</div>';
+  }).join("");
+
+  return ''+
+  '<div class="screen-center">'+
+    '<div class="screen-card" style="max-width:840px;">'+
+      '<h2>'+t("reviewHeading",L)+'</h2>'+
+      '<p>'+t("reviewSub",L)+'</p>'+
+      '<div class="review-list">'+cards+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ======================================================================
+   MODAL
+   ====================================================================== */
+function renderModal(){
+  if(!modal) return "";
+  var L = state.lang;
+  if(modal.type === "reset"){
+    return ''+
+    '<div class="modal-backdrop" data-action="modal-backdrop">'+
+      '<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">'+
+        '<h3 id="modal-title">'+t("resetTitle",L)+'</h3>'+
+        '<p>'+t("resetBody",L)+'</p>'+
+        '<div class="modal-actions">'+
+          '<button type="button" class="btn btn-ghost" data-action="close-modal">'+t("resetCancel",L)+'</button>'+
+          '<button type="button" class="btn btn-primary" data-action="confirm-reset">'+t("resetConfirm",L)+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
+  return "";
+}
+
+/* ======================================================================
+   MAIN RENDER
+   ====================================================================== */
+function render(){
+  var L = state.lang;
+  document.documentElement.lang = L;
+  document.documentElement.dir = (L === "ar") ? "rtl" : "ltr";
+  document.body.className = (L === "ar") ? "lang-ar" : "lang-en";
+
+  var body = "";
+  if(state.view === "home"){ body = renderHome(); }
+  else if(state.view === "incident"){ body = renderIncidentView(); }
+  else if(state.view === "pause"){ body = renderPause(); }
+  else if(state.view === "reveal"){ body = renderReveal(); }
+  else if(state.view === "review"){ body = renderReview(); }
+
+  var showHero = (state.view !== "incident");
+  var html = renderTopbar() + (showHero ? renderHero() : (renderHero())) + '<main>'+body+'</main>' + renderModal();
+  document.getElementById("root").innerHTML = html;
+
+  if(state.view === "reveal"){
+    if(!revealPlayed){
+      revealPlayed = true;
+      playRevealSequence();
+    } else {
+      var grid = document.getElementById("reveal-grid");
+      if(grid){
+        grid.querySelectorAll(".morph-card").forEach(function(c){ c.classList.add("flipped"); });
+      }
+      ["reveal-sub","reveal-quote","reveal-cta"].forEach(function(id){
+        var el = document.getElementById(id);
+        if(el) el.classList.add("show");
+      });
+    }
+  } else {
+    revealPlayed = false;
+  }
+
+  var modalEl = document.querySelector(".modal");
+  if(modalEl){ modalEl.focus && modalEl.focus(); }
+}
+
+/* ======================================================================
+   TIMER TICKING (updates bar fill without resetting timer start)
+   ====================================================================== */
+setInterval(function(){
+  if(state.view !== "incident") return;
+  var inc = currentIncident();
+  var incState = state.incidents[inc.id];
+  if(incState.phase !== "think" && incState.phase !== "discuss") return;
+  var bar = document.querySelector('[data-timer-for="'+inc.id+'"] .timer-fill');
+  if(!bar) return;
+  var ratio = timerRemainingRatio(inc.id);
+  bar.style.transform = "scaleX("+ratio+")";
+  var label = document.querySelector('[data-timer-for="'+inc.id+'"] .timer-label');
+  if(label && timerDone(inc.id)){
+    label.textContent = t("timerReady", state.lang);
+  }
+}, 250);
+
+/* ======================================================================
+   ACTIONS
+   ====================================================================== */
+function setLang(lang){
+  if(state.lang === lang) return;
+  state.lang = lang;
+  saveState();
+  render();
+}
+
+function startPart1(){
+  state.view = "incident";
+  state.currentIndex = 0;
+  saveState();
+  render();
+}
+
+function gotoIncident(idx){
+  var inc = INCIDENTS[idx];
+  if(!state.incidents[inc.id].locked && idx !== state.currentIndex) return;
+  state.currentIndex = idx;
+  state.view = "incident";
+  saveState();
+  render();
+}
+
+function advancePhase(to){
+  var inc = currentIncident();
+  var incState = state.incidents[inc.id];
+  if(to === "evidence" && !incState.primary){
+    validation[inc.id] = "verdict";
+    render();
+    return;
+  }
+  validation[inc.id] = null;
+  incState.phase = to;
+  saveState();
+  render();
+}
+
+function choosePrimary(lensId){
+  var inc = currentIncident();
+  var incState = state.incidents[inc.id];
+  incState.primary = lensId;
+  if(incState.secondary === lensId){ incState.secondary = null; }
+  validation[inc.id] = null;
+  saveState();
+  render();
+}
+
+function chooseSecondary(lensId){
+  var inc = currentIncident();
+  var incState = state.incidents[inc.id];
+  incState.secondary = (lensId === "none") ? "none" : lensId;
+  saveState();
+  render();
+}
+
+function toggleEvidence(evId, incId){
+  var incState = state.incidents[incId];
+  if(!incState) return;
+  var idx = incState.evidence.indexOf(evId);
+  if(idx !== -1){
+    incState.evidence.splice(idx,1);
+  } else {
+    if(incState.evidence.length >= 2) return;
+    incState.evidence.push(evId);
+  }
+  validation[incId] = null;
+  validation["review_"+incId] = null;
+  saveState();
+  render();
+}
+
+function lockVerdict(){
+  var inc = currentIncident();
+  var incState = state.incidents[inc.id];
+  if(incState.evidence.length === 0){
+    validation[inc.id] = "evidence";
+    render();
+    return;
+  }
+  validation[inc.id] = null;
+  incState.phase = "locked";
+  incState.locked = true;
+  saveState();
+  render();
+}
+
+function nextIncident(){
+  state.currentIndex += 1;
+  saveState();
+  render();
+}
+
+function returnToFrontier(){
+  var idx = frontierIndex();
+  state.currentIndex = Math.min(idx, INCIDENTS.length - 1);
+  saveState();
+  render();
+}
+
+function finishPart1(){
+  state.part1Complete = true;
+  state.view = "pause";
+  saveState();
+  render();
+}
+
+function openAfterLearning(){
+  state.afterLearningUnlocked = true;
+  state.view = "reveal";
+  saveState();
+  render();
+}
+
+function gotoReview(){
+  state.view = "review";
+  saveState();
+  render();
+}
+
+function reviewKeep(incId){
+  state.incidents[incId].reviewDecision = "kept";
+  saveState();
+  render();
+}
+function reviewEditOpen(incId){
+  state.incidents[incId].reviewEditing = true;
+  saveState();
+  render();
+}
+function reviewEditCancel(incId){
+  state.incidents[incId].reviewEditing = false;
+  saveState();
+  render();
+}
+function reviewChoosePrimary(incId, lensId){
+  state.incidents[incId].primary = lensId;
+  validation["review_"+incId] = null;
+  saveState();
+  render();
+}
+function reviewSave(incId){
+  var incState = state.incidents[incId];
+  if(incState.evidence.length === 0){
+    validation["review_"+incId] = "evidence";
+    render();
+    return;
+  }
+  incState.reviewEditing = false;
+  incState.reviewDecision = "changed";
+  validation["review_"+incId] = null;
+  saveState();
+  render();
+}
+
+function openResetModal(){ modal = {type:"reset"}; render(); }
+function closeModal(){ modal = null; render(); }
+function confirmReset(){
+  try{ storage.remove(STORAGE_KEY); }catch(e){}
+  state = freshState();
+  timerRuntime = {};
+  validation = {};
+  modal = null;
+  saveState();
+  render();
+}
+
+/* ======================================================================
+   EVENT DELEGATION
+   ====================================================================== */
+document.addEventListener("click", function(e){
+  var el = e.target.closest("[data-action]");
+  if(!el) return;
+  var action = el.getAttribute("data-action");
+
+  switch(action){
+    case "set-lang": setLang(el.getAttribute("data-lang")); break;
+    case "start-part1": startPart1(); break;
+    case "goto-incident": gotoIncident(parseInt(el.getAttribute("data-idx"),10)); break;
+    case "advance-phase": advancePhase(el.getAttribute("data-to")); break;
+    case "choose-primary": choosePrimary(el.getAttribute("data-lens-id")); break;
+    case "choose-secondary": chooseSecondary(el.getAttribute("data-lens-id")); break;
+    case "toggle-evidence": toggleEvidence(el.getAttribute("data-ev"), el.getAttribute("data-inc")); break;
+    case "lock-verdict": lockVerdict(); break;
+    case "next-incident": nextIncident(); break;
+    case "return-to-frontier": returnToFrontier(); break;
+    case "finish-part1": finishPart1(); break;
+    case "open-afterlearning": openAfterLearning(); break;
+    case "goto-review": gotoReview(); break;
+    case "review-keep": reviewKeep(el.getAttribute("data-inc")); break;
+    case "review-edit-open": reviewEditOpen(el.getAttribute("data-inc")); break;
+    case "review-edit-cancel": reviewEditCancel(el.getAttribute("data-inc")); break;
+    case "review-choose-primary": reviewChoosePrimary(el.getAttribute("data-inc"), el.getAttribute("data-lens-id")); break;
+    case "review-save": reviewSave(el.getAttribute("data-inc")); break;
+    case "open-reset": openResetModal(); break;
+    case "close-modal": closeModal(); break;
+    case "confirm-reset": confirmReset(); break;
+    case "modal-backdrop": if(e.target === el){ closeModal(); } break;
+  }
+});
+
+/* Keyboard support for radiogroups (lens cards / secondary chips) */
+document.addEventListener("keydown", function(e){
+  if(e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  var active = document.activeElement;
+  if(!active || active.getAttribute("role") !== "radio") return;
+  var group = active.closest('[role="radiogroup"]');
+  if(!group) return;
+  var radios = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+  var idx = radios.indexOf(active);
+  if(idx === -1) return;
+  var dir = (e.key === "ArrowRight" || e.key === "ArrowDown") ? 1 : -1;
+  if(document.documentElement.dir === "rtl" && (e.key === "ArrowRight" || e.key === "ArrowLeft")){ dir *= -1; }
+  var nextIdx = (idx + dir + radios.length) % radios.length;
+  radios[nextIdx].focus();
+  e.preventDefault();
+});
+
+/* Escape closes modal; Tab is trapped inside it while open */
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape" && modal){ closeModal(); return; }
+  if(e.key === "Tab" && modal){
+    var modalEl = document.querySelector(".modal");
+    if(!modalEl) return;
+    var focusables = Array.prototype.slice.call(modalEl.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+    if(focusables.length === 0) return;
+    var first = focusables[0], last = focusables[focusables.length-1];
+    if(e.shiftKey && document.activeElement === first){
+      last.focus(); e.preventDefault();
+    } else if(!e.shiftKey && document.activeElement === last){
+      first.focus(); e.preventDefault();
+    }
+  }
+});
+
+/* ======================================================================
+   INIT
+   ====================================================================== */
+render();
+
+})();
+</script>
+</body>
+</html>
